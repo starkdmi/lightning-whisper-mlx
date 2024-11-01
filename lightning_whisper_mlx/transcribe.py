@@ -68,7 +68,7 @@ def transcribe_audio(
     temperature: Union[float, Tuple[float, ...]] = (0.0, 1.0),
     compression_ratio_threshold: Optional[float] = 2.4,
     logprob_threshold: Optional[float] = -1, 
-    no_speech_threshold: Optional[float] = 0.6,
+    no_speech_threshold: Optional[float] = 0.4,
     condition_on_previous_text: bool = True,
     initial_prompt: Optional[str] = None,
     word_timestamps: bool = False,
@@ -210,7 +210,7 @@ def transcribe_audio(
         return decode_results
 
     def decode_with_fallback(segment_batch: mx.array) -> DecodingResult:
-        decode_results = decode_process(segment_batch, 0.0) # temperature
+        decode_results = decode_process(segment_batch, 0.0)
         final_decode = []
 
         for i, decode_result in enumerate(decode_results):
@@ -273,7 +273,7 @@ def transcribe_audio(
             "compression_ratio": res.compression_ratio,
             "no_speech_prob": res.no_speech_prob,
         }
-    
+
     def format_output(tokens, res, mel_segment):
         seek = 0
         current_segments = []
@@ -405,6 +405,19 @@ def transcribe_audio(
                 append_punctuations=append_punctuations,
                 last_speech_timestamp=last_speech_timestamp
             )
+
+            valid_segments = []
+            for segment in segments_for_timestamps:
+                if "words" in segment:
+                    filtered_words = [
+                        word for word in segment["words"] 
+                        if word.get("probability", 0) > 0.2 # word probability threshold
+                    ]
+                    if filtered_words:
+                        segment["words"] = filtered_words
+                        segment["text"] = "".join(w["word"] for w in filtered_words)
+                        valid_segments.append(segment)
+            current_segments = valid_segments
 
         return current_segments, seek
 
